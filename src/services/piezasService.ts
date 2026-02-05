@@ -8,8 +8,7 @@ import {
     orderBy,
     Timestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import type { AsignacionPieza, PiezaFilters, ReporteFilters } from '../types';
 
 const COLLECTION_NAME = 'piezas';
@@ -24,6 +23,7 @@ const toDate = (timestamp: Timestamp | Date): Date => {
 
 export const piezasService = {
     async getAll(filters?: PiezaFilters): Promise<AsignacionPieza[]> {
+        // Firestore query - order by fechaRegistro since fechaModificacion may not exist in older docs
         let q = query(collection(db, COLLECTION_NAME), orderBy('fechaRegistro', 'desc'));
 
         const snapshot = await getDocs(q);
@@ -35,7 +35,8 @@ export const piezasService = {
                 usuarioId: data.usuarioId || null,
                 estatusId: data.estatusId || null,
                 fotoUrl: data.fotoUrl || null,
-                fechaRegistro: toDate(data.fechaRegistro)
+                fechaRegistro: toDate(data.fechaRegistro),
+                fechaModificacion: data.fechaModificacion ? toDate(data.fechaModificacion) : toDate(data.fechaRegistro)
             } as AsignacionPieza;
         });
 
@@ -53,6 +54,13 @@ export const piezasService = {
             }
         }
 
+        // Client-side sort by modification date (latest first)
+        results.sort((a, b) => {
+            const aDate = a.fechaModificacion || a.fechaRegistro;
+            const bDate = b.fechaModificacion || b.fechaRegistro;
+            return bDate.getTime() - aDate.getTime();
+        });
+
         return results;
     },
 
@@ -68,7 +76,8 @@ export const piezasService = {
                 usuarioId: data.usuarioId || null,
                 estatusId: data.estatusId || null,
                 fotoUrl: data.fotoUrl || null,
-                fechaRegistro: toDate(data.fechaRegistro)
+                fechaRegistro: toDate(data.fechaRegistro),
+                fechaModificacion: data.fechaModificacion ? toDate(data.fechaModificacion) : toDate(data.fechaRegistro)
             } as AsignacionPieza;
         });
 
@@ -118,9 +127,17 @@ export const piezasService = {
                     bVal = b.estatusId || '';
                     break;
                 case 'fecha':
-                default:
                     aVal = a.fechaRegistro;
                     bVal = b.fechaRegistro;
+                    break;
+                case 'modificacion':
+                    aVal = a.fechaModificacion || a.fechaRegistro;
+                    bVal = b.fechaModificacion || b.fechaRegistro;
+                    break;
+                default:
+                    // Default to modification date for general ordering
+                    aVal = a.fechaModificacion || a.fechaRegistro;
+                    bVal = b.fechaModificacion || b.fechaRegistro;
                     break;
             }
 
@@ -145,7 +162,8 @@ export const piezasService = {
             usuarioId: data.usuarioId || null,
             estatusId: data.estatusId || null,
             fotoUrl: data.fotoUrl || null,
-            fechaRegistro: toDate(data.fechaRegistro)
+            fechaRegistro: toDate(data.fechaRegistro),
+            fechaModificacion: data.fechaModificacion ? toDate(data.fechaModificacion) : toDate(data.fechaRegistro)
         };
     },
 
@@ -157,21 +175,44 @@ export const piezasService = {
             descripcion: pieza.descripcion,
             usuarioId: pieza.usuarioId,
             estatusId: pieza.estatusId,
-            fotoUrl: pieza.fotoUrl,
+            fotoUrl: pieza.fotoUrl, // Now expects a direct URL string
             fechaRegistro: existing.exists()
                 ? existing.data().fechaRegistro
-                : Timestamp.now()
+                : Timestamp.now(),
+            fechaModificacion: Timestamp.now()
         });
     },
 
-    async uploadPhoto(file: File): Promise<string> {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `fotos/${timestamp}_${file.name}`;
-        const storageRef = ref(storage, fileName);
+    // Helper to transform Google Drive links to viewable URLs
+    transformGoogleDriveUrl(url: string): string | null {
+        if (!url) return null;
 
-        await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(storageRef);
+        // Extract ID from common Google Drive URL patterns
+        // Pattern 1: /file/d/ID/view
+        // Pattern 2: id=ID
+        let id = '';
+        const patterns = [
+            /\/file\/d\/([a-zA-Z0-9_-]+)/,
+            /id=([a-zA-Z0-9_-]+)/
+        ];
 
-        return downloadUrl;
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                id = match[1];
+                break;
+            }
+        }
+
+        if (id) {
+            // Return a direct download/thumbnail link that works for <img> tags
+            // Using 'lh3.googleusercontent.com' is often more reliable for images than 'drive.google.com/uc'
+            // but the standard export=view link is the official way.
+            // Using the /uc?export=view&id=ID format for simplicity and general compatibility.
+            return `https://drive.google.com/uc?export=view&id=${id}`;
+        }
+
+        // If no ID found, return original URL (might be a non-Drive link)
+        return url;
     }
 };

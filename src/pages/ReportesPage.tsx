@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FileText, Filter, Download, Loader2, X } from 'lucide-react';
+import { FileText, Filter, Download, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { piezasService } from '../services/piezasService';
 import { usuariosService } from '../services/usuariosService';
 import { estatusService } from '../services/estatusService';
 import type { AsignacionPieza, Usuario, EstatusPieza, ReporteFilters } from '../types';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export function ReportesPage() {
@@ -14,6 +14,8 @@ export function ReportesPage() {
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const [filters, setFilters] = useState<ReporteFilters>({
         codigo: '',
@@ -59,6 +61,7 @@ export function ReportesPage() {
     };
 
     const handleApplyFilters = () => {
+        setCurrentPage(1); // Reset to first page when filters change
         loadPiezas();
     };
 
@@ -246,7 +249,8 @@ export function ReportesPage() {
                             <option value="descripcion">Descripción</option>
                             <option value="usuario">Usuario</option>
                             <option value="estatus">Estatus</option>
-                            <option value="fecha">Fecha</option>
+                            <option value="fecha">Fecha Registro</option>
+                            <option value="modificacion">Fecha Modificación</option>
                         </select>
                         <select
                             value={filters.orderDesc ? 'desc' : 'asc'}
@@ -306,23 +310,53 @@ export function ReportesPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {piezas.map((pieza) => (
-                                    <tr key={pieza.codigo} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{pieza.codigo}</td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{pieza.descripcion || '-'}</td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{getUsuarioNombre(pieza.usuarioId)}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                                {getEstatusNombre(pieza.estatusId)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-500 text-sm">
-                                            {pieza.fechaRegistro.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {piezas
+                                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                                    .map((pieza) => (
+                                        <tr key={pieza.codigo} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{pieza.codigo}</td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{pieza.descripcion || '-'}</td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{getUsuarioNombre(pieza.usuarioId)}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                    {getEstatusNombre(pieza.estatusId)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-500 text-sm">
+                                                {pieza.fechaRegistro.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!loading && piezas.length > 0 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                            Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, piezas.length)} - {Math.min(currentPage * itemsPerPage, piezas.length)} de {piezas.length}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-sm text-slate-600 dark:text-slate-400">
+                                Página {currentPage} de {Math.ceil(piezas.length / itemsPerPage)}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(piezas.length / itemsPerPage), p + 1))}
+                                disabled={currentPage >= Math.ceil(piezas.length / itemsPerPage)}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

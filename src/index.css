@@ -46,9 +46,18 @@
   border-color: hsl(var(--border));
 }
 
+html {
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+}
+
+.dark html,
+html:has(.dark) {
+  background: linear-gradient(to bottom right, #0f172a, #1e293b);
+}
+
 body {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background-color: hsl(var(--background));
+  background-color: transparent;
   color: hsl(var(--foreground));
   margin: 0;
   min-height: 100vh;
@@ -61,8 +70,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -72,6 +80,12 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
 /* Glassmorphism utility */

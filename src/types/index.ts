@@ -18,6 +18,7 @@ export interface AsignacionPieza {
     estatusId: string | null;
     fotoUrl: string | null;
     fechaRegistro: Date;
+    fechaModificacion?: Date; // Optional for backward compatibility
 }
 
 // Form filter types
@@ -31,6 +32,6 @@ export interface ReporteFilters extends PiezaFilters {
     descripcion?: string;
     fechaDesde?: Date | null;
     fechaHasta?: Date | null;
-    orderBy: 'codigo' | 'descripcion' | 'usuario' | 'estatus' | 'fecha';
+    orderBy: 'codigo' | 'descripcion' | 'usuario' | 'estatus' | 'fecha' | 'modificacion';
     orderDesc: boolean;
 }

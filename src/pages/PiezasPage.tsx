@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Package, Save, Search, Plus, Filter, X, ImagePlus, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Package, Save, Search, Plus, Filter, X, Image, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { piezasService } from '../services/piezasService';
 import { usuariosService } from '../services/usuariosService';
 import { estatusService } from '../services/estatusService';
@@ -12,6 +12,8 @@ export function PiezasPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     // Form state
     const [formData, setFormData] = useState<Partial<AsignacionPieza>>({
@@ -22,9 +24,7 @@ export function PiezasPage() {
         fotoUrl: null,
     });
     const [displayDate, setDisplayDate] = useState<string>('(auto)');
-    const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Filter state
     const [filters, setFilters] = useState<PiezaFilters>({
@@ -74,7 +74,7 @@ export function PiezasPage() {
             fotoUrl: null,
         });
         setDisplayDate('(auto)');
-        setPhotoFile(null);
+        setDisplayDate('(auto)');
         setPhotoPreview(null);
     };
 
@@ -105,15 +105,23 @@ export function PiezasPage() {
             fotoUrl: pieza.fotoUrl,
         });
         setDisplayDate(pieza.fechaRegistro.toLocaleString());
-        setPhotoPreview(pieza.fotoUrl);
-        setPhotoFile(null);
+
+        // Transform the URL for preview if it's a Drive link
+        const displayUrl = piezasService.transformGoogleDriveUrl(pieza.fotoUrl || '') || pieza.fotoUrl;
+        setPhotoPreview(displayUrl);
     };
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setPhotoFile(file);
-            setPhotoPreview(URL.createObjectURL(file));
+    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const url = e.target.value;
+        setFormData({ ...formData, fotoUrl: url });
+
+        // Try to generate a preview
+        const previewUrl = piezasService.transformGoogleDriveUrl(url);
+        if (previewUrl) {
+            setPhotoPreview(previewUrl);
+        } else {
+            // If it's not a recognizable Drive link, assume it might be a direct image link or stay empty
+            setPhotoPreview(url || null);
         }
     };
 
@@ -127,10 +135,7 @@ export function PiezasPage() {
             setSaving(true);
             setError(null);
 
-            let fotoUrl = formData.fotoUrl;
-            if (photoFile) {
-                fotoUrl = await piezasService.uploadPhoto(photoFile);
-            }
+            const fotoUrl = formData.fotoUrl;
 
             const pieza: AsignacionPieza = {
                 codigo: formData.codigo.trim(),
@@ -295,36 +300,58 @@ export function PiezasPage() {
                         </div>
                     </div>
 
-                    {/* Right: Photo */}
-                    <div className="flex flex-col items-center">
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full aspect-square max-w-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-violet-500 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-all overflow-hidden"
-                        >
+                    {/* Right: Photo / URL Input */}
+                    <div className="flex flex-col gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Link de imagen (Google Drive)
+                            </label>
+                            <div className="relative">
+                                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={formData.fotoUrl || ''}
+                                    onChange={handleUrlChange}
+                                    placeholder="https://drive.google.com/..."
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Pega el enlace de compartir de Google Drive
+                            </p>
+                        </div>
+
+                        <div className="w-full aspect-square max-w-[200px] mx-auto border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/50 overflow-hidden">
                             {photoPreview ? (
-                                <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+                                <div className="relative w-full h-full group">
+                                    <img
+                                        src={photoPreview}
+                                        alt="Vista previa"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            // Fallback if image fails to load
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            setPhotoPreview(null);
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            setPhotoPreview(null);
+                                            setFormData({ ...formData, fotoUrl: null });
+                                        }}
+                                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Quitar imagen"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
                             ) : (
-                                <>
-                                    <ImagePlus className="w-10 h-10 text-slate-400 mb-2" />
-                                    <span className="text-sm text-slate-500 dark:text-slate-400">Agregar foto</span>
-                                </>
+                                <div className="flex flex-col items-center text-slate-400 p-4 text-center">
+                                    <Image className="w-8 h-8 mb-2" />
+                                    <span className="text-xs">Vista previa de imagen</span>
+                                </div>
                             )}
                         </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoChange}
-                            className="hidden"
-                        />
-                        {photoPreview && (
-                            <button
-                                onClick={() => { setPhotoPreview(null); setPhotoFile(null); setFormData({ ...formData, fotoUrl: null }); }}
-                                className="mt-2 text-sm text-red-500 hover:text-red-600"
-                            >
-                                Eliminar foto
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
@@ -403,27 +430,57 @@ export function PiezasPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {piezas.map((pieza) => (
-                                    <tr
-                                        key={pieza.codigo}
-                                        onClick={() => loadPieceIntoForm(pieza)}
-                                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                                    >
-                                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{pieza.codigo}</td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{pieza.descripcion || '-'}</td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{getUsuarioNombre(pieza.usuarioId)}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                                {getEstatusNombre(pieza.estatusId)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-500 text-sm">
-                                            {pieza.fechaRegistro.toLocaleDateString()}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {piezas
+                                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                                    .map((pieza) => (
+                                        <tr
+                                            key={pieza.codigo}
+                                            onClick={() => loadPieceIntoForm(pieza)}
+                                            className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                        >
+                                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{pieza.codigo}</td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{pieza.descripcion || '-'}</td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{getUsuarioNombre(pieza.usuarioId)}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                    {getEstatusNombre(pieza.estatusId)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-500 text-sm">
+                                                {pieza.fechaRegistro.toLocaleDateString()}
+                                            </td>
+                                        </tr>
+                                    ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!loading && piezas.length > 0 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                            Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, piezas.length)} - {Math.min(currentPage * itemsPerPage, piezas.length)} de {piezas.length}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-sm text-slate-600 dark:text-slate-400">
+                                Página {currentPage} de {Math.ceil(piezas.length / itemsPerPage)}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(piezas.length / itemsPerPage), p + 1))}
+                                disabled={currentPage >= Math.ceil(piezas.length / itemsPerPage)}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
