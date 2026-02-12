@@ -13,9 +13,9 @@ export function Layout() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
             {/* Desktop Sidebar */}
-            <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-50">
+            <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 flex-col bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 z-50">
                 {/* Logo Section */}
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                <div className="p-6">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-violet-500/25">
                             <Package className="w-5 h-5 text-white" />
@@ -51,7 +51,7 @@ export function Layout() {
                 </nav>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="p-4">
                     <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
                         v1.0.0
                     </p>
@@ -59,7 +59,7 @@ export function Layout() {
             </aside>
 
             {/* Mobile Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-slate-200/50 dark:border-slate-700/50">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass shadow-[0_-4px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
                 <div className="flex items-center justify-around py-2">
                     {navItems.map(({ to, label, icon: Icon }) => (
                         <NavLink

@@ -205,11 +205,9 @@ export const piezasService = {
         }
 
         if (id) {
-            // Return a direct download/thumbnail link that works for <img> tags
-            // Using 'lh3.googleusercontent.com' is often more reliable for images than 'drive.google.com/uc'
-            // but the standard export=view link is the official way.
-            // Using the /uc?export=view&id=ID format for simplicity and general compatibility.
-            return `https://drive.google.com/uc?export=view&id=${id}`;
+            // The /uc?export=view format no longer works reliably for <img> tags.
+            // Use the thumbnail endpoint which Google still supports for embedding.
+            return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
         }
 
         // If no ID found, return original URL (might be a non-Drive link)
